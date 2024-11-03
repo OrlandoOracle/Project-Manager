@@ -1,269 +1,157 @@
-// components/MainApp.tsx
-'use client'
-
 import React, { useState } from 'react'
-import { 
-  LayoutDashboard, 
-  Calendar, 
-  Lightbulb, 
-  Home, 
-  Plus, 
-  Mic, 
-  Video, 
-  Star, 
-  Wand2, 
-  Briefcase, 
-  Clock,
-  Edit2,
-  Trash2,
-  Archive  // Added Archive here
-} from 'lucide-react'
-import { Card, CardHeader, CardTitle, CardContent } from './ui/card'
-import { Alert, AlertDescription } from './ui/alert'
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from './ui/dialog'
+import { useRouter } from 'next/router'
+import Image from 'next/image'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
 
-interface Project {
-  id: number
+interface Task {
+  id: string
   title: string
-  type: 'magic' | 'business'
-  category: 'project' | 'area' | 'resource' | 'archive'
-  status: 'active' | 'in-progress' | 'completed'
+  description: string
   progress: number
-  lastUpdated: string
-  tags: string[]
-  thumbnail: string
-  emotion: string
+  dueDate: string
+  priority: 'low' | 'medium' | 'high'
+  attachments: string[]
+  status: 'pending' | 'in-progress' | 'completed'
 }
 
 const MainApp = () => {
-  const [currentView, setCurrentView] = useState('dashboard')
-  const [projects, setProjects] = useState<Project[]>(() => {
-    const savedProjects = localStorage.getItem('projects')
-    return savedProjects ? JSON.parse(savedProjects) : [
-      {
-        id: 1,
-        title: "New Card Routine",
-        type: "magic",
-        status: "active",
-        progress: 65,
-        lastUpdated: "2 days ago",
-        tags: ["#CloseUp", "#Cards"],
-        thumbnail: "/api/placeholder/400/200",
-        emotion: "🔥",
-        category: "project"
-      }
-    ]
-  })
+  const [tasks, setTasks] = useState<Task[]>([])
+  const [isDialogOpen, setIsDialogOpen] = useState(false)
+  const [selectedTask, setSelectedTask] = useState<Task | null>(null)
+  const router = useRouter()
 
-  const navigationItems = [
-    { id: 'dashboard', label: 'Dashboard', icon: Home },
-    { id: 'projects', label: 'Projects', icon: Briefcase },
-    { id: 'areas', label: 'Areas', icon: LayoutDashboard },
-    { id: 'resources', label: 'Resources', icon: Lightbulb },
-    { id: 'archives', label: 'Archives', icon: Archive }
-  ]
-
-  const [isEditMode, setIsEditMode] = useState(false)
-  const [currentProject, setCurrentProject] = useState<Project | null>(null)
-  const [dialogOpen, setDialogOpen] = useState(false)
-
-  React.useEffect(() => {
-    localStorage.setItem('projects', JSON.stringify(projects))
-  }, [projects])
-
-  const handleAddOrUpdateProject = (e: React.FormEvent) => {
-    e.preventDefault()
-    
-    if (!currentProject?.title.trim()) return
-
-    if (isEditMode && currentProject) {
-      setProjects(prev => prev.map(p => 
-        p.id === currentProject.id ? {
-          ...currentProject,
-          lastUpdated: 'Just updated'
-        } : p
-      ))
-    } else {
-      setProjects(prev => [...prev, {
-        ...currentProject!,
-        id: Date.now(),
-        status: 'active',
-        progress: 0,
-        lastUpdated: 'Just now',
-        tags: [],
-        thumbnail: '/api/placeholder/400/200',
-        emotion: '🎯',
-        category: 'project'
-      }])
-    }
-
-    setCurrentProject(null)
-    setIsEditMode(false)
-    setDialogOpen(false)
-  }
-
-  const handleEdit = (project: Project) => {
-    setCurrentProject(project)
-    setIsEditMode(true)
-    setDialogOpen(true)
-  }
-
-  const handleDelete = (projectId: number) => {
-    if (window.confirm('Are you sure you want to delete this project?')) {
-      setProjects(prev => prev.filter(p => p.id !== projectId))
+  const handleEdit = (taskId: string) => {
+    const taskToEdit = tasks.find(task => task.id === taskId)
+    if (taskToEdit) {
+      setSelectedTask(taskToEdit)
+      setIsDialogOpen(true)
     }
   }
 
-  const handleProgressUpdate = (projectId: number, newProgress: number) => {
-    setProjects(prev => prev.map(p => 
-      p.id === projectId ? {
-        ...p,
-        progress: Math.min(100, Math.max(0, newProgress))
-      } : p
+  const handleDelete = (taskId: string) => {
+    setTasks(tasks.filter(task => task.id !== taskId))
+  }
+
+  const handleProgressUpdate = (taskId: string, progress: number) => {
+    setTasks(tasks.map(task => 
+      task.id === taskId ? { ...task, progress } : task
     ))
   }
 
-  return (
-    <div className="flex h-screen bg-[#121212]">
-      {/* Sidebar Navigation */}
-      <div className="w-64 bg-[#1E1E1E] border-r border-[#2D2D2D] h-full p-4">
-        <div className="flex items-center gap-2 mb-8">
-          <LayoutDashboard className="text-[#4169E1]" />
-          <h1 className="text-xl font-bold text-white">Project Hub</h1>
-        </div>
-        
-        <nav className="space-y-2">
-          {navigationItems.map(item => (
-            <button
-              key={item.id}
-              onClick={() => setCurrentView(item.id)}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
-                currentView === item.id 
-                  ? 'bg-[#4169E1] text-white' 
-                  : 'text-[#C0C0C0] hover:bg-[#2D2D2D]'
-              }`}
-            >
-              <item.icon size={20} />
-              <span>{item.label}</span>
-            </button>
-          ))}
-        </nav>
+  const handleAddTask = (newTask: Omit<Task, 'id'>) => {
+    const task: Task = {
+      ...newTask,
+      id: Math.random().toString(36).substr(2, 9)
+    }
+    setTasks([...tasks, task])
+  }
 
-        {/* Quick Stats */}
-        <div className="mt-8 p-4 bg-[#2D2D2D] rounded-lg">
-          <h3 className="font-medium mb-2 text-[#C0C0C0]">Quick Stats</h3>
-          <div className="space-y-2 text-sm text-white">
-            <div className="flex justify-between">
-              <span>Active Projects:</span>
-              <span className="font-medium">{projects.length}</span>
-            </div>
-            <div className="flex justify-between">
-              <span>Due This Week:</span>
-              <span className="font-medium">
-                {projects.filter(p => p.status === 'active').length}
+  const handleUpdateTask = (updatedTask: Task) => {
+    setTasks(tasks.map(task => 
+      task.id === updatedTask.id ? updatedTask : task
+    ))
+    setIsDialogOpen(false)
+    setSelectedTask(null)
+  }
+
+  return (
+    <div className="container mx-auto p-4">
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-2xl font-bold">Project Manager</h1>
+        <Button onClick={() => setIsDialogOpen(true)}>Add New Task</Button>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {tasks.map(task => (
+          <div key={task.id} className="border rounded-lg p-4 shadow-sm">
+            <div className="flex justify-between items-start mb-2">
+              <h3 className="font-semibold">{task.title}</h3>
+              <span className={`px-2 py-1 rounded-full text-xs ${
+                task.priority === 'high' ? 'bg-red-100 text-red-800' :
+                task.priority === 'medium' ? 'bg-yellow-100 text-yellow-800' :
+                'bg-green-100 text-green-800'
+              }`}>
+                {task.priority}
               </span>
             </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Main Content Area */}
-      <div className="flex-1 overflow-auto">
-        {currentView === 'dashboard' ? (
-          <div className="p-8">
-            <div className="max-w-6xl mx-auto">
-              <div className="flex justify-between items-center mb-6">
-                <h1 className="text-3xl font-bold text-white">My Projects</h1>
-                <button
-                  onClick={() => {
-                    setIsEditMode(false)
-                    setCurrentProject({
-                      id: 0,
-                      title: '',
-                      type: 'magic',
-                      status: 'active',
-                      progress: 0,
-                      lastUpdated: '',
-                      tags: [],
-                      thumbnail: '',
-                      emotion: '',
-                      category: 'project'
-                    })
-                    setDialogOpen(true)
-                  }}
-                  className="flex items-center gap-2 bg-[#4169E1] hover:bg-[#3558BC] text-white px-4 py-2 rounded-lg transition-colors"
-                >
-                  <Plus size={20} />
-                  Add Project
-                </button>
+            <p className="text-gray-600 text-sm mb-2">{task.description}</p>
+            <div className="space-y-2">
+              <div className="w-full bg-gray-200 rounded-full h-2">
+                <div
+                  className="bg-blue-600 h-2 rounded-full transition-all"
+                  style={{ width: `${task.progress}%` }}
+                />
               </div>
-
-              {/* Dialog for Adding/Editing Project */}
-              <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-                <DialogContent className="bg-[#1E1E1E] text-white border border-[#2D2D2D]">
-                  <DialogHeader>
-                    <DialogTitle>{isEditMode ? 'Edit Project' : 'Add New Project'}</DialogTitle>
-                  </DialogHeader>
-                  <form onSubmit={handleAddOrUpdateProject} className="space-y-4">
-                    <div>
-                      <label className="block text-sm font-medium mb-1 text-[#C0C0C0]">Title</label>
-                      <input
-                        type="text"
-                        value={currentProject?.title || ''}
-                        onChange={(e) => setCurrentProject(prev => prev ? {...prev, title: e.target.value} : null)}
-                        className="w-full p-2 bg-[#2D2D2D] border border-[#4169E1] rounded text-white focus:outline-none focus:ring-2 focus:ring-[#4169E1]"
-                        placeholder="Project title"
-                      />
-                    </div>
-                    <button
-                      type="submit"
-                      className="w-full bg-[#4169E1] hover:bg-[#3558BC] text-white p-2 rounded transition-colors"
-                    >
-                      {isEditMode ? 'Update Project' : 'Create Project'}
-                    </button>
-                  </form>
-                </DialogContent>
-              </Dialog>
-
-              {/* Display of Projects */}
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {projects.map(project => (
-                  <Card key={project.id} className="bg-[#1E1E1E] border-[#2D2D2D] hover:border-[#4169E1] transition-colors">
-                    <CardHeader>
-                      <img 
-                        src={project.thumbnail} 
-                        alt={project.title}
-                        className="rounded-lg mb-2"
-                      />
-                      <div className="flex justify-between items-start">
-                        <CardTitle className="flex items-center gap-2 text-white">
-                          {project.type === 'magic' ? <Wand2 size={20} className="text-[#4169E1]" /> : <Briefcase size={20} className="text-[#4169E1]" />}
-                          {project.title}
-                        </CardTitle>
-                      </div>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="space-y-4">
-                        <div className="flex flex-wrap gap-2">
-                          {project.tags.map(tag => (
-                            <span key={tag} className="bg-[#2D2D2D] text-[#C0C0C0] text-sm px-2 py-1 rounded">
-                              {tag}
-                            </span>
-                          ))}
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
+              <div className="flex justify-between text-sm text-gray-500">
+                <span>Due: {new Date(task.dueDate).toLocaleDateString()}</span>
+                <span>{task.progress}% Complete</span>
               </div>
             </div>
+            <div className="mt-4 flex justify-end space-x-2">
+              <Button variant="outline" size="sm" onClick={() => handleEdit(task.id)}>
+                Edit
+              </Button>
+              <Button variant="destructive" size="sm" onClick={() => handleDelete(task.id)}>
+                Delete
+              </Button>
+            </div>
           </div>
-        ) : (
-          <div className="p-8">
-            <h1 className="text-3xl font-bold text-white">Other Views Coming Soon</h1>
-          </div>
-        )}
+        ))}
       </div>
+
+      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{selectedTask ? 'Edit Task' : 'Add New Task'}</DialogTitle>
+            <DialogDescription>
+              {selectedTask ? 'Update the task details below' : 'Enter the task details below'}
+            </DialogDescription>
+          </DialogHeader>
+          <form className="space-y-4">
+            <div>
+              <Label htmlFor="title">Title</Label>
+              <Input id="title" defaultValue={selectedTask?.title} />
+            </div>
+            <div>
+              <Label htmlFor="description">Description</Label>
+              <Input id="description" defaultValue={selectedTask?.description} />
+            </div>
+            <div>
+              <Label htmlFor="dueDate">Due Date</Label>
+              <Input type="date" id="dueDate" defaultValue={selectedTask?.dueDate} />
+            </div>
+            <div>
+              <Label htmlFor="priority">Priority</Label>
+              <select
+                id="priority"
+                className="w-full border rounded-md p-2"
+                defaultValue={selectedTask?.priority}
+              >
+                <option value="low">Low</option>
+                <option value="medium">Medium</option>
+                <option value="high">High</option>
+              </select>
+            </div>
+            <div className="flex justify-end space-x-2">
+              <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>
+                Cancel
+              </Button>
+              <Button type="submit">
+                {selectedTask ? 'Update Task' : 'Add Task'}
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
